@@ -1,0 +1,59 @@
+name: Aggregator
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'  # Every 4 hours
+  workflow_dispatch:       # Manual trigger
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_DB=job_aggregator \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            postgres:14-alpine
+          
+          # Wait for DB to be ready
+          for i in {1..30}; do
+            docker exec postgres pg_isready -U postgres && break
+            sleep 1
+          done
+          docker exec postgres pg_isready -U postgres
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run migration
+        run: psql -h localhost -U postgres -d job_aggregator -f internal/db/migrations/001_init.sql
+        env:
+          PGPASSWORD: postgres
+
+      - name: Build binary
+        run: go build -v -o aggregator ./cmd/aggregator
+
+      - name: Run aggregator
+        env:
+          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/job_aggregator?sslmode=disable"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: ./aggregator

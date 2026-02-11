@@ -1,0 +1,18 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/aggregator
+
+# Environment
+.env
+
+# Logs
+*.log
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
