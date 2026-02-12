@@ -1,5 +1,6 @@
 name: Aggregator
 
+# Activated schedule trigger — commit after initial push
 on:
   schedule:
     - cron: '0 */4 * * *'  # Every 4 hours
